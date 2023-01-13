@@ -12,6 +12,9 @@
 typedef float dot_t;
 
 #define MIN(a, b) (a) < (b) ? (a) : (b)
+#ifndef TEST_CNT
+#define TEST_CNT 5
+#endif
 
 HYPRE_BigInt read_binary(void * buf, const char * filename, int size_of_elems, long long start, HYPRE_BigInt nums) {
     assert(size_of_elems == 4 || size_of_elems == 8);
@@ -154,6 +157,7 @@ int main(int argc, char * argv[])
 
     // HYPRE_Init(argc, argv);
     HYPRE_Init();
+    for (int test = 0; test < TEST_CNT; test++) {
     
     HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);// Create the matrix.
     // Note that this is a square matrix, so we indicate the row partition size twice (since number of rows = number of cols)
@@ -265,6 +269,7 @@ int main(int argc, char * argv[])
     /* Clean up */
     HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b); HYPRE_IJVectorDestroy(x); HYPRE_IJVectorDestroy(y);
+    }// test loop
 
     HYPRE_Finalize();
     MPI_Finalize();

@@ -15,6 +15,9 @@ typedef double data_t;
 typedef double dot_t;
 
 #define MIN(a, b) (a) < (b) ? (a) : (b)
+#ifndef TEST_CNT
+#define TEST_CNT 5
+#endif
 
 int main(int argc, char * argv[])
 {
@@ -82,6 +85,7 @@ int main(int argc, char * argv[])
     HYPRE_SStructVector   b, x, y;
     HYPRE_SStructSolver   solver, precond;
 
+    for (int test = 0; test < TEST_CNT; test++) {
     {// Setup a grid
         HYPRE_SStructGridCreate(cart_comm, ndim, nparts, &grid);// Create an empty 3D grid object
         HYPRE_SStructGridSetExtents(grid, part, ilower, iupper);// Add a new box to the grid
@@ -375,6 +379,7 @@ int main(int argc, char * argv[])
         HYPRE_SStructStencilDestroy(stencils[s]);
     HYPRE_SStructMatrixDestroy(A);
     HYPRE_SStructVectorDestroy(b); HYPRE_SStructVectorDestroy(x); HYPRE_SStructVectorDestroy(y);
+    }
 
     /* Finalize HYPRE */
     HYPRE_Finalize();
