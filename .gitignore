@@ -1,0 +1,4 @@
+mpi-include/
+.vscode/
+hypre-2.25.0/
+*.exe
