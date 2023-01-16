@@ -18,51 +18,41 @@ HYPRE_F32_I64_LIB  = $(HYPRE_F32_I64_HOME)/lib
 HYPRE_F32_I64_INCLUDE = $(HYPRE_F32_I64_HOME)/include
 L_F32_I64_HYPRE = -L$(HYPRE_F32_I64_LIB) -lHYPRE
 
-# SUPERLU_HOME = $(SOFT_HOME)/superlu/5.3.0
-# LSUPERLU = -L$(SUPERLU_HOME)/lib64 -lsuperlu
-
-# LBLAS = -L${BLAS_LIB} -lopenblas
-
-# METIS_HOME = $(SOFT_HOME)/metis/5.1.0
-# PAR_METIS_HOME = $(SOFT_HOME)/parmetis/4.0.3
-# LMETIS = -L$(PAR_METIS_HOME)/lib -lparmetis -L$(METIS_HOME)/lib -lmetis
-
 CXX= mpicxx
 CFLAGS = -O3 -std=c++11 -fopenmp -g
 
 CL = mpicxx
 LFLAGS = -lm -fopenmp -ldl
 
-all: base_struct.exe base_sstruct.exe base_hypre_f64.exe base_hypre_f32.exe base_hypre_f32_i64.exe
+all:	base_sstruct_f64.exe\
+	base_sstruct_f32.exe\
+	base_struct_f64.exe\
+	base_struct_f32.exe\
+	base_IJ_f32.exe\
+	base_IJ_f64.exe\
+	base_IJ_f32_i64.exe
 
-ALL_F64_LINK = $(L_F64_HYPRE) #$(LSUPERLU) $(LBLAS) $(LMETIS)
-ALL_F32_LINK = $(L_F32_HYPRE)
-ALL_F32_I64_LINK = $(L_F32_I64_HYPRE)
+base_struct_f64.exe : base_struct.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F64_INCLUDE) $^ $(L_F64_HYPRE) $(LFLAGS) -o $@
 
-base_struct.exe : base_struct.o
-	$(CL) $^ $(ALL_F64_LINK) $(LFLAGS) -o $@
-base_struct.o : base_struct.c
-	$(CXX) -c $^ $(CFLAGS) -I$(HYPRE_F64_INCLUDE) -o $@
+base_struct_f32.exe : base_struct.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F32_INCLUDE) $^ $(L_F32_HYPRE) $(LFLAGS) -o $@
 
-base_sstruct.exe : base_sstruct.o
-	$(CL) $^ $(ALL_F64_LINK) $(LFLAGS) -o $@
-base_sstruct.o : base_sstruct.c
-	$(CXX) -c $^ $(CFLAGS) -I$(HYPRE_F64_INCLUDE) -o $@
+base_sstruct_f64.exe : base_sstruct.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F64_INCLUDE) $^ $(L_F64_HYPRE) $(LFLAGS) -o $@
 
-base_hypre_f64.exe : base_hypre_f64.o
-	$(CL) $^ $(ALL_F64_LINK) $(LFLAGS) -o $@
-base_hypre_f64.o : base_hypre_f64.c
-	$(CXX) -c $^ $(CFLAGS) -I$(HYPRE_F64_INCLUDE) -o $@
+base_sstruct_f32.exe : base_sstruct_grapes.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F32_INCLUDE) $^ $(L_F32_HYPRE) $(LFLAGS) -o $@
 
-base_hypre_f32.exe : base_hypre_f32.o
-	$(CL) $^ $(ALL_F32_LINK) $(LFLAGS) -o $@
-base_hypre_f32.o : base_hypre_f32.c
-	$(CXX) -c $^ $(CFLAGS) -I$(HYPRE_F32_INCLUDE) -o $@
+base_IJ_f64.exe : base_IJ.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F64_INCLUDE) $^ $(L_F64_HYPRE) $(LFLAGS) -o $@
 
-base_hypre_f32_i64.exe : base_hypre_f32_i64.o
-	$(CL) $^ $(ALL_F32_I64_LINK) $(LFLAGS) -o $@
-base_hypre_f32_i64.o : base_hypre_f32.c
-	$(CXX) -c $^ $(CFLAGS) -I$(HYPRE_F32_I64_INCLUDE) -o $@
+base_IJ_f32.exe : base_IJ.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F32_INCLUDE) $^ $(L_F32_HYPRE) $(LFLAGS) -o $@
+
+base_IJ_f32_i64.exe : base_IJ.c
+	$(CXX) $(CFLAGS) -I$(HYPRE_F32_I64_INCLUDE) $^ $(L_F32_I64_HYPRE) $(LFLAGS) -o $@
+
 
 default: all
 .PHONY: all clean
