@@ -100,8 +100,6 @@ int main(int argc, char * argv[])
         {// Setup a grid
             HYPRE_StructGridCreate(cart_comm, ndim, &grid);// Create an empty 3D grid object
             HYPRE_StructGridSetExtents(grid, ilower, iupper);// Add a new box to the grid
-            HYPRE_Int period[ndim] = {0, gx, 0};
-            HYPRE_StructGridSetPeriodic(grid, period);// 周期性！
             HYPRE_StructGridAssemble(grid);// a collective call finalizing the grid assembly.
         }
         num_diag = 19;
@@ -137,7 +135,7 @@ int main(int argc, char * argv[])
         if      (strcmp(case_name, "LASER") == 0) assert(sizeof(double) == sizeof(HYPRE_Real));
         else if (strcmp(case_name, "GRAPES")== 0) assert(sizeof(float ) == sizeof(HYPRE_Real));
         MPI_File fh = MPI_FILE_NULL;// 文件句柄
-        MPI_Datatype etype = MPI_DOUBLE;// 给定的数据是双精度的
+        MPI_Datatype etype = (sizeof(HYPRE_Real) == 4) ? MPI_FLOAT : MPI_DOUBLE;
         MPI_Datatype read_type = MPI_DATATYPE_NULL;// 写出类型
         HYPRE_Int size[4], subsize[4], start[4];
         size   [0] = gy       ; size   [1] = gx       ; size   [2] = gz       ; size   [3] = num_diag;
@@ -302,6 +300,7 @@ int main(int argc, char * argv[])
     }
     else if (strcmp(case_name, "GRAPES") == 0) {
         HYPRE_StructGMRESCreate(cart_comm, &solver);
+        HYPRE_StructGMRESSetKDim(solver, 10);
         HYPRE_StructGMRESSetMaxIter(solver, 1000);
         HYPRE_StructGMRESSetAbsoluteTol(solver, 1.0e-05);
         HYPRE_StructGMRESSetTol(solver, 0.0);

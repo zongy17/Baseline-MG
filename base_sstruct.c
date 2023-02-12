@@ -138,9 +138,8 @@ int main(int argc, char * argv[])
             HYPRE_Int tot_len = nnz_len * num_elems;
             HYPRE_Real * buf = (HYPRE_Real *) malloc (sizeof(HYPRE_Real) * tot_len);
             // 首先MPI-IO读入矩阵数据
-            assert(sizeof(double) == sizeof(HYPRE_Real));
             MPI_File fh = MPI_FILE_NULL;// 文件句柄
-            MPI_Datatype etype = MPI_DOUBLE;// 给定的数据是双精度的
+            MPI_Datatype etype = (sizeof(HYPRE_Real) == 4) ? MPI_FLOAT : MPI_DOUBLE;
             MPI_Datatype read_type = MPI_DATATYPE_NULL;// 写出类型
             HYPRE_Int size[4], subsize[4], start[4];
             size   [0] = gy       ; size   [1] = gx       ; size   [2] = gz       ; size   [3] = nnz_len;
@@ -150,7 +149,7 @@ int main(int argc, char * argv[])
             MPI_Type_create_subarray(4, size, subsize, start, MPI_ORDER_C, etype, &read_type);
             MPI_Type_commit(&read_type);
             MPI_Offset displacement = 0;
-            displacement *= sizeof(double);// 位移要以字节为单位！
+            displacement *= sizeof(HYPRE_Real);// 位移要以字节为单位！
             MPI_Status status;
 
             int ret;
@@ -357,9 +356,8 @@ int main(int argc, char * argv[])
             HYPRE_Int tot_len = num_elems * read_num_diag * lms;
             HYPRE_Real * buf = (HYPRE_Real *) malloc (sizeof(HYPRE_Real) * tot_len);
             // 首先MPI-IO读入矩阵数据
-            assert(sizeof(double) == sizeof(HYPRE_Real));
             MPI_File fh = MPI_FILE_NULL;// 文件句柄
-            MPI_Datatype etype = MPI_DOUBLE;// 给定的数据是双精度的
+            MPI_Datatype etype = (sizeof(HYPRE_Real) == 4) ? MPI_FLOAT : MPI_DOUBLE;
             MPI_Datatype read_type = MPI_DATATYPE_NULL;// 写出类型
             HYPRE_Int size[4], subsize[4], start[4];
             size   [0] = gy       ; size   [1] = gx       ; size   [2] = gz       ; size   [3] = read_num_diag * lms;
@@ -369,7 +367,7 @@ int main(int argc, char * argv[])
             MPI_Type_create_subarray(4, size, subsize, start, MPI_ORDER_C, etype, &read_type);
             MPI_Type_commit(&read_type);
             MPI_Offset displacement = 0;
-            displacement *= sizeof(double);// 位移要以字节为单位！
+            displacement *= sizeof(HYPRE_Real);// 位移要以字节为单位！
             MPI_Status status;
 
             int ret;
@@ -499,11 +497,11 @@ int main(int argc, char * argv[])
         }
     }
 
-    double b_dot;
+    HYPRE_Real b_dot;
     b_dot = hypre_SStructKrylovInnerProd(b, b);
     if (my_pid == 0) printf("(  b,   b) = %.20e\n",  b_dot);
     {// Check for DEBUG purpose
-        double x_dot, Ab_dot;
+        HYPRE_Real x_dot, Ab_dot;
         x_dot = hypre_SStructKrylovInnerProd(x, x);
         if (my_pid == 0) printf("(  x,   x) = %.20e\n",  x_dot);
         HYPRE_SStructMatrixMatvec(1.0, A, b, 0.0, y);
@@ -546,9 +544,9 @@ int main(int argc, char * argv[])
             MPI_Abort(MPI_COMM_WORLD, -101);
         }
 
-        double t_setup = MPI_Wtime();
+        HYPRE_Real t_setup = MPI_Wtime();
         HYPRE_SStructPCGSetup(solver, A, b, x ); t_setup = MPI_Wtime() - t_setup;
-        double t_calc  = MPI_Wtime();
+        HYPRE_Real t_calc  = MPI_Wtime();
         HYPRE_SStructPCGSolve(solver, A, b, x);  t_calc  = MPI_Wtime() - t_calc;
 
         // Get info and release memory
@@ -573,7 +571,7 @@ int main(int argc, char * argv[])
     // 计算真实残差
     HYPRE_SStructVectorCopy(b, y);// y = b
     HYPRE_SStructMatrixMatvec(-1.0, A, x, 1.0, y);// y += -A*x
-    double r_dot;
+    HYPRE_Real r_dot;
     r_dot = hypre_SStructKrylovInnerProd(y, y);
     if (my_pid == 0) printf("\033[1;35mtrue ||r||/||b||= %20.16e\033[0m\n", sqrt(r_dot/b_dot));
     
