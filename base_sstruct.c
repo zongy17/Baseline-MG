@@ -40,7 +40,7 @@ int main(int argc, char * argv[])
     HYPRE_Int lx, ly, lz;
     if (gx % px != 0 || gy % py != 0 || gz % pz != 0) {// check if input is legal
         MPI_Comm_rank(MPI_COMM_WORLD, &my_pid);
-        if (my_pid == 0) printf("Error: Illegal input! gx/y/z must be fully divided by px/y/z!\n", gx, gy, gz, px, py, pz);
+        if (my_pid == 0) printf("Error: Illegal input! gx/y/z must be fully divided by px/y/z!\n");
         MPI_Abort(MPI_COMM_WORLD, -1);
     } else {
         lx = gx / px;

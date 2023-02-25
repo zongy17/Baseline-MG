@@ -16,6 +16,7 @@ int main(int argc, char * argv[])
     HYPRE_Int glb_nrows;
 
     MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_pid);
 
     HYPRE_Int cnt = 1;
     const char * case_name = argv[cnt++];
@@ -34,14 +35,12 @@ int main(int argc, char * argv[])
         glb_nrows = gx * gy * gz;
     }
     else {
-        MPI_Comm_rank(MPI_COMM_WORLD, &my_pid);
         if (my_pid == 0) printf("Error: Unrecognized case name %s\n", case_name);
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
     HYPRE_Int lx, ly, lz;
     if (gx % px != 0 || gy % py != 0 || gz % pz != 0) {// check if input is legal
-        MPI_Comm_rank(MPI_COMM_WORLD, &my_pid);
-        if (my_pid == 0) printf("Error: Illegal input! gx/y/z must be fully divided by px/y/z!\n", gx, gy, gz, px, py, pz);
+        if (my_pid == 0) printf("Error: Illegal input! gx/y/z must be fully divided by px/y/z!\n");
         MPI_Abort(MPI_COMM_WORLD, -1);
     } else {
         lx = gx / px;
@@ -49,6 +48,11 @@ int main(int argc, char * argv[])
         lz = gz / pz;
     }
     const HYPRE_Int ndim = 3;
+    if (my_pid == 0) {
+        printf("lx %d ly %d lz %d\n", lx, ly, lz);
+        printf("HYPRE_Int %ld HYPRE_BigInt %ld HYPRE_Real %ld bytes\n",
+            sizeof(HYPRE_Int), sizeof(HYPRE_BigInt), sizeof(HYPRE_Real));
+    }
 
     MPI_Comm cart_comm;
     int cart_ids[ndim], pidx, pidy, pidz;
@@ -334,9 +338,9 @@ int main(int argc, char * argv[])
             HYPRE_StructPFMGSetTol(precond, 0.0);
             HYPRE_StructPFMGSetZeroGuess(precond);
             // HYPRE_StructPFMGSetRAPType(precond, 0);
-            HYPRE_StructPFMGSetRelaxType(precond, 2);// 0: 655次，1: 70次，
-            HYPRE_StructPFMGSetNumPreRelax(precond, 2);
-            HYPRE_StructPFMGSetNumPostRelax(precond, 2);
+            HYPRE_StructPFMGSetRelaxType(precond, 1);// 对于960x576的算例，0: 55次 1: 45次 2: Too many
+            HYPRE_StructPFMGSetNumPreRelax(precond, 1);
+            HYPRE_StructPFMGSetNumPostRelax(precond, 1);
             HYPRE_StructGMRESSetPrecond(solver,   HYPRE_StructPFMGSolve,
                                                 HYPRE_StructPFMGSetup, precond);
         }
