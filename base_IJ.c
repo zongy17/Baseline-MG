@@ -178,24 +178,28 @@ int main(int argc, char * argv[])
     }
 
     HYPRE_Real* dist_rbm0 = NULL, * dist_rbm1 = NULL, * dist_rbm2 = NULL;
+    HYPRE_Int avail_rbms = 0;
     if (strstr(case_name, "SOLID")) {
         dist_rbm0 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
         sprintf(filename, "%s/rbm0.bin", pathname);
         if ((ret = read_binary(dist_rbm0, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
-            printf("Error! not enough rbm0\n");
-            MPI_Abort(MPI_COMM_WORLD, 4);
+            printf("Warning! not enough rbm0\n");
+        } else {
+            avail_rbms ++;
         }
         dist_rbm1 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
         sprintf(filename, "%s/rbm1.bin", pathname);
         if ((ret = read_binary(dist_rbm1, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
-            printf("Error! not enough rbm1\n");
-            MPI_Abort(MPI_COMM_WORLD, 4);
+            printf("Warning! not enough rbm1\n");
+        } else {
+            avail_rbms ++;
         }
         dist_rbm2 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
         sprintf(filename, "%s/rbm2.bin", pathname);
         if ((ret = read_binary(dist_rbm2, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
-            printf("Error! not enough rbm2\n");
-            MPI_Abort(MPI_COMM_WORLD, 4);
+            printf("Warning! not enough rbm2\n");
+        } else {
+            avail_rbms ++;
         }
     }
 
@@ -335,45 +339,58 @@ int main(int argc, char * argv[])
             HYPRE_BoomerAMGCreate(&precond);
             HYPRE_BoomerAMGSetPrintLevel(precond, 1);
             HYPRE_BoomerAMGSetMaxLevels(precond, 25);
-            /*
-            HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
-            HYPRE_BoomerAMGSetNodal(precond, 4);// 0、1、2都不能收敛，会因为预条件的不正定而CG直接断掉，3大约125次，4、5、6均大约70次
-            // HYPRE_BoomerAMGSetCoarsenType(precond, 6);// PMIS和HMIS差别不大，其它的都不收敛直接断掉
-            HYPRE_BoomerAMGSetRelaxType(precond, 26);// vector version of symGS
-            // HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// 会报错
-            // HYPRE_BoomerAMGSetRelaxOrder(precond, 1);// 用不用它对迭代数差别不大，但不用它单步时间快一些
-            */
+            if (avail_rbms == 3) {
+                if (my_pid == 0) printf("using rigid body modes....\n");
+                // Nodal coarsening options (nodal coarsening is required for this solver)
+                // See hypre's new_ij driver and the paper for descriptions.
+                HYPRE_Int nodal                 = 4; // strength reduction norm: 1, 3 or 4
+                HYPRE_Int nodal_diag            = 1; // diagonal in strength matrix: 0, 1 or 2
+                HYPRE_Int relax_coarse          = 8; // smoother on the coarsest grid: 8, 99 or 29
+                // Elasticity interpolation options
+                HYPRE_Int interp_vec_variant    = 2; // 1 = GM-1, 2 = GM-2, 3 = LN
+                HYPRE_Int q_max                 = 4; // max elements per row for each Q
+                HYPRE_Int smooth_interp_vectors = 1; // smooth the rigid-body modes?
+                // Optionally pre-process the interpolation matrix through iterative weight
+                // refinement (this is generally applicable for any system)
+                HYPRE_Int interp_refine         = 1;
 
-            // Nodal coarsening options (nodal coarsening is required for this solver)
-            // See hypre's new_ij driver and the paper for descriptions.
-            HYPRE_Int nodal                 = 4; // strength reduction norm: 1, 3 or 4
-            HYPRE_Int nodal_diag            = 1; // diagonal in strength matrix: 0, 1 or 2
-            HYPRE_Int relax_coarse          = 8; // smoother on the coarsest grid: 8, 99 or 29
-            // Elasticity interpolation options
-            HYPRE_Int interp_vec_variant    = 2; // 1 = GM-1, 2 = GM-2, 3 = LN
-            HYPRE_Int q_max                 = 4; // max elements per row for each Q
-            HYPRE_Int smooth_interp_vectors = 1; // smooth the rigid-body modes?
-            // Optionally pre-process the interpolation matrix through iterative weight
-            // refinement (this is generally applicable for any system)
-            HYPRE_Int interp_refine         = 1;
+                // HYPRE_BoomerAMGSetInterpType(precond, 6);// BEST: extended classical modiﬁed interpolation (interpolation type 6)
+                // HYPRE_BoomerAMGSetCoarsenType(precond, 10);// BEST: HMIS coarsening (coarsen type 10),
+                HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// BEST: aggressive coarsening on the ﬁnest level (aggressive num levels 1)
+                // HYPRE_BoomerAMGSetPMaxElmts(precond, 5);// BEST: truncated interpolation to ﬁve entries per row (PMaxElmts option equals 5)
+                HYPRE_BoomerAMGSetStrongThreshold(precond, 0.25);// BEST: strength-of-connection tolerance of 0.25
+                HYPRE_BoomerAMGSetRelaxType(precond, 6);// BEST: hybrid symmetric Gauss–Seidel (relax type 6)
 
-            // HYPRE_BoomerAMGSetInterpType(precond, 6);// BEST: extended classical modiﬁed interpolation (interpolation type 6)
-            // HYPRE_BoomerAMGSetCoarsenType(precond, 10);// BEST: HMIS coarsening (coarsen type 10),
-            HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// BEST: aggressive coarsening on the ﬁnest level (aggressive num levels 1)
-            // HYPRE_BoomerAMGSetPMaxElmts(precond, 5);// BEST: truncated interpolation to ﬁve entries per row (PMaxElmts option equals 5)
-            HYPRE_BoomerAMGSetStrongThreshold(precond, 0.25);// BEST: strength-of-connection tolerance of 0.25
-            HYPRE_BoomerAMGSetRelaxType(precond, 6);// BEST: hybrid symmetric Gauss–Seidel (relax type 6)
+                HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
+                HYPRE_BoomerAMGSetNodal(precond, nodal);
+                HYPRE_BoomerAMGSetNodalDiag(precond, nodal_diag);
+                HYPRE_BoomerAMGSetCycleRelaxType(precond, relax_coarse, 3);
+                // HYPRE_BoomerAMGSetSmoothInterpVectors(precond, 1);
+                // HYPRE_BoomerAMGSetInterpRefine(precond, 1);
+                HYPRE_BoomerAMGSetInterpVecVariant(precond, interp_vec_variant);
+                HYPRE_BoomerAMGSetInterpVecQMax(precond, q_max);
+                HYPRE_BoomerAMGSetInterpVectors(precond, 3, par_rbms);
 
-            HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
-            HYPRE_BoomerAMGSetNodal(precond, 4);
-            HYPRE_BoomerAMGSetNodalDiag(precond, 1);
-            HYPRE_BoomerAMGSetCycleRelaxType(precond, 8, 3);
-            // HYPRE_BoomerAMGSetSmoothInterpVectors(precond, 1);
-            // HYPRE_BoomerAMGSetInterpRefine(precond, 1);
-            HYPRE_BoomerAMGSetInterpVecVariant(precond, interp_vec_variant);
-            HYPRE_BoomerAMGSetInterpVecQMax(precond, q_max);
-            HYPRE_BoomerAMGSetInterpVectors(precond, 3, par_rbms);
+                // Reviewer# 4
+                // HYPRE_BoomerAMGSetCoarsenType(precond, 8); // -pc_hypre_boomeramg_coarsen_type pmis
+                // HYPRE_BoomerAMGSetInterpType(precond, 6); // -pc_hypre_boomeramg_interp_type ext+i
+                // HYPRE_BoomerAMGSetRelaxOrder(precond, 0); // -pc_hypre_boomeramg_no_CF
+                // HYPRE_BoomerAMGSetPMaxElmts(precond, 6); // -pc_hypre_boomeramg_P_max 6
+                // // HYPRE_BoomerAMGSetPrintLevel(precond, 3); // -pc_hypre_boomeramg_print_statistics 1
+                // HYPRE_BoomerAMGSetCycleRelaxType(precond, 16, 1); // -pc_hypre_boomeramg_relax_type_down Chebyshev
+                // HYPRE_BoomerAMGSetCycleRelaxType(precond, 16, 2); // -pc_hypre_boomeramg_relax_type_up Chebyshev
+                // HYPRE_BoomerAMGSetStrongThreshold(precond, 0.5); // -pc_hypre_boomeramg_strong_threshold 0.5
+            } else {
+                if (my_pid == 0) printf("NO use of rigid body modes....\n");
 
+                //原来写在paper里所用的设置
+                HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
+                HYPRE_BoomerAMGSetNodal(precond, 4);// 0、1、2都不能收敛，会因为预条件的不正定而CG直接断掉，3大约125次，4、5、6均大约70次
+                // HYPRE_BoomerAMGSetCoarsenType(precond, 6);// PMIS和HMIS差别不大，其它的都不收敛直接断掉
+                HYPRE_BoomerAMGSetRelaxType(precond, 26);// vector version of symGS
+                // HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// 会报错
+                // HYPRE_BoomerAMGSetRelaxOrder(precond, 1);// 用不用它对迭代数差别不大，但不用它单步时间快一些
+            }
             HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero */
             HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
             HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
@@ -544,9 +561,9 @@ int main(int argc, char * argv[])
     free(dist_b); free(dist_x);
     free(dist_row_ptr); free(dist_col_idx); free(dist_vals);
     if (strstr(case_name, "SOLID")) {
-        HYPRE_IJVectorDestroy(dist_rbm0);
-        HYPRE_IJVectorDestroy(dist_rbm1);
-        HYPRE_IJVectorDestroy(dist_rbm2);
+        free(dist_rbm0);
+        free(dist_rbm1);
+        free(dist_rbm2);
     }
 
     return 0;
