@@ -177,10 +177,34 @@ int main(int argc, char * argv[])
         }
     }
 
+    HYPRE_Real* dist_rbm0 = NULL, * dist_rbm1 = NULL, * dist_rbm2 = NULL;
+    if (strstr(case_name, "SOLID")) {
+        dist_rbm0 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
+        sprintf(filename, "%s/rbm0.bin", pathname);
+        if ((ret = read_binary(dist_rbm0, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
+            printf("Error! not enough rbm0\n");
+            MPI_Abort(MPI_COMM_WORLD, 4);
+        }
+        dist_rbm1 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
+        sprintf(filename, "%s/rbm1.bin", pathname);
+        if ((ret = read_binary(dist_rbm1, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
+            printf("Error! not enough rbm1\n");
+            MPI_Abort(MPI_COMM_WORLD, 4);
+        }
+        dist_rbm2 = (HYPRE_Real*) malloc (loc_nrows * sizeof(HYPRE_Real));
+        sprintf(filename, "%s/rbm2.bin", pathname);
+        if ((ret = read_binary(dist_rbm2, filename, sizeof(HYPRE_Real), ilower, loc_nrows)) != loc_nrows) {
+            printf("Error! not enough rbm2\n");
+            MPI_Abort(MPI_COMM_WORLD, 4);
+        }
+    }
+
     HYPRE_IJMatrix A;
     HYPRE_ParCSRMatrix parcsr_A;
     HYPRE_IJVector b, x, y;
     HYPRE_ParVector par_b, par_x, par_y;
+    HYPRE_IJVector rbms[3];
+    HYPRE_ParVector par_rbms[3];
     HYPRE_Solver solver, precond;
 
     // HYPRE_Init(argc, argv);
@@ -210,6 +234,17 @@ int main(int argc, char * argv[])
 
         HYPRE_IJVectorSetValues(b, loc_nrows, row_idx, dist_b);
         HYPRE_IJVectorSetValues(x, loc_nrows, row_idx, dist_x);
+        if (strstr(case_name, "SOLID")) {
+            HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &rbms[0]); HYPRE_IJVectorSetObjectType(rbms[0], HYPRE_PARCSR); HYPRE_IJVectorInitialize(rbms[0]); 
+            HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &rbms[1]); HYPRE_IJVectorSetObjectType(rbms[1], HYPRE_PARCSR); HYPRE_IJVectorInitialize(rbms[1]); 
+            HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &rbms[2]); HYPRE_IJVectorSetObjectType(rbms[2], HYPRE_PARCSR); HYPRE_IJVectorInitialize(rbms[2]); 
+            HYPRE_IJVectorSetValues(rbms[0], loc_nrows, row_idx, dist_rbm0);
+            HYPRE_IJVectorSetValues(rbms[1], loc_nrows, row_idx, dist_rbm1);
+            HYPRE_IJVectorSetValues(rbms[2], loc_nrows, row_idx, dist_rbm2);
+            HYPRE_IJVectorAssemble(rbms[0]);  HYPRE_IJVectorGetObject(rbms[0], (void **) &par_rbms[0]);
+            HYPRE_IJVectorAssemble(rbms[1]);  HYPRE_IJVectorGetObject(rbms[1], (void **) &par_rbms[1]);
+            HYPRE_IJVectorAssemble(rbms[2]);  HYPRE_IJVectorGetObject(rbms[2], (void **) &par_rbms[2]);
+        }
         free(row_idx);
         free(nnz_per_row);
     }
@@ -296,15 +331,49 @@ int main(int argc, char * argv[])
         HYPRE_PCGSetLogging(solver, 1); /* needed to get run info later */
 
         {// 预条件AMG
+            
             HYPRE_BoomerAMGCreate(&precond);
             HYPRE_BoomerAMGSetPrintLevel(precond, 1);
             HYPRE_BoomerAMGSetMaxLevels(precond, 25);
+            /*
             HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
             HYPRE_BoomerAMGSetNodal(precond, 4);// 0、1、2都不能收敛，会因为预条件的不正定而CG直接断掉，3大约125次，4、5、6均大约70次
             // HYPRE_BoomerAMGSetCoarsenType(precond, 6);// PMIS和HMIS差别不大，其它的都不收敛直接断掉
             HYPRE_BoomerAMGSetRelaxType(precond, 26);// vector version of symGS
             // HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// 会报错
             // HYPRE_BoomerAMGSetRelaxOrder(precond, 1);// 用不用它对迭代数差别不大，但不用它单步时间快一些
+            */
+
+            // Nodal coarsening options (nodal coarsening is required for this solver)
+            // See hypre's new_ij driver and the paper for descriptions.
+            HYPRE_Int nodal                 = 4; // strength reduction norm: 1, 3 or 4
+            HYPRE_Int nodal_diag            = 1; // diagonal in strength matrix: 0, 1 or 2
+            HYPRE_Int relax_coarse          = 8; // smoother on the coarsest grid: 8, 99 or 29
+            // Elasticity interpolation options
+            HYPRE_Int interp_vec_variant    = 2; // 1 = GM-1, 2 = GM-2, 3 = LN
+            HYPRE_Int q_max                 = 4; // max elements per row for each Q
+            HYPRE_Int smooth_interp_vectors = 1; // smooth the rigid-body modes?
+            // Optionally pre-process the interpolation matrix through iterative weight
+            // refinement (this is generally applicable for any system)
+            HYPRE_Int interp_refine         = 1;
+
+            // HYPRE_BoomerAMGSetInterpType(precond, 6);// BEST: extended classical modiﬁed interpolation (interpolation type 6)
+            // HYPRE_BoomerAMGSetCoarsenType(precond, 10);// BEST: HMIS coarsening (coarsen type 10),
+            HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// BEST: aggressive coarsening on the ﬁnest level (aggressive num levels 1)
+            // HYPRE_BoomerAMGSetPMaxElmts(precond, 5);// BEST: truncated interpolation to ﬁve entries per row (PMaxElmts option equals 5)
+            HYPRE_BoomerAMGSetStrongThreshold(precond, 0.25);// BEST: strength-of-connection tolerance of 0.25
+            HYPRE_BoomerAMGSetRelaxType(precond, 6);// BEST: hybrid symmetric Gauss–Seidel (relax type 6)
+
+            HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
+            HYPRE_BoomerAMGSetNodal(precond, 4);
+            HYPRE_BoomerAMGSetNodalDiag(precond, 1);
+            HYPRE_BoomerAMGSetCycleRelaxType(precond, 8, 3);
+            // HYPRE_BoomerAMGSetSmoothInterpVectors(precond, 1);
+            // HYPRE_BoomerAMGSetInterpRefine(precond, 1);
+            HYPRE_BoomerAMGSetInterpVecVariant(precond, interp_vec_variant);
+            HYPRE_BoomerAMGSetInterpVecQMax(precond, q_max);
+            HYPRE_BoomerAMGSetInterpVectors(precond, 3, par_rbms);
+
             HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero */
             HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
             HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
@@ -461,6 +530,11 @@ int main(int argc, char * argv[])
     /* Clean up */
     HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b); HYPRE_IJVectorDestroy(x); HYPRE_IJVectorDestroy(y);
+    if (strstr(case_name, "SOLID")) {
+        HYPRE_IJVectorDestroy(rbms[0]);
+        HYPRE_IJVectorDestroy(rbms[1]);
+        HYPRE_IJVectorDestroy(rbms[2]);
+    }
     
     }// test loop
 
@@ -469,6 +543,11 @@ int main(int argc, char * argv[])
 
     free(dist_b); free(dist_x);
     free(dist_row_ptr); free(dist_col_idx); free(dist_vals);
+    if (strstr(case_name, "SOLID")) {
+        HYPRE_IJVectorDestroy(dist_rbm0);
+        HYPRE_IJVectorDestroy(dist_rbm1);
+        HYPRE_IJVectorDestroy(dist_rbm2);
+    }
 
     return 0;
 }
