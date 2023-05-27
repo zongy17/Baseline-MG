@@ -354,16 +354,18 @@ int main(int argc, char * argv[])
                 // refinement (this is generally applicable for any system)
                 HYPRE_Int interp_refine         = 1;
 
-                // HYPRE_BoomerAMGSetInterpType(precond, 6);// BEST: extended classical modiﬁed interpolation (interpolation type 6)
-                // HYPRE_BoomerAMGSetCoarsenType(precond, 10);// BEST: HMIS coarsening (coarsen type 10),
+                HYPRE_BoomerAMGSetInterpType(precond, 6);// BEST: extended classical modiﬁed interpolation (interpolation type 6)
+                HYPRE_BoomerAMGSetCoarsenType(precond, 8);// BEST: HMIS coarsening (coarsen type 10),
                 HYPRE_BoomerAMGSetAggNumLevels(precond, 1);// BEST: aggressive coarsening on the ﬁnest level (aggressive num levels 1)
-                // HYPRE_BoomerAMGSetPMaxElmts(precond, 5);// BEST: truncated interpolation to ﬁve entries per row (PMaxElmts option equals 5)
+                HYPRE_BoomerAMGSetPMaxElmts(precond, 6);// BEST: truncated interpolation to ﬁve entries per row (PMaxElmts option equals 5)
                 HYPRE_BoomerAMGSetStrongThreshold(precond, 0.25);// BEST: strength-of-connection tolerance of 0.25
-                HYPRE_BoomerAMGSetRelaxType(precond, 6);// BEST: hybrid symmetric Gauss–Seidel (relax type 6)
+                // HYPRE_BoomerAMGSetRelaxType(precond, 6);// BEST: hybrid symmetric Gauss–Seidel (relax type 6)
 
                 HYPRE_BoomerAMGSetNumFunctions(precond, ndof);
                 HYPRE_BoomerAMGSetNodal(precond, nodal);
                 HYPRE_BoomerAMGSetNodalDiag(precond, nodal_diag);
+                HYPRE_BoomerAMGSetCycleRelaxType(precond, 16, 1);
+                HYPRE_BoomerAMGSetCycleRelaxType(precond, 16, 2);
                 HYPRE_BoomerAMGSetCycleRelaxType(precond, relax_coarse, 3);
                 // HYPRE_BoomerAMGSetSmoothInterpVectors(precond, 1);
                 // HYPRE_BoomerAMGSetInterpRefine(precond, 1);
